@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this atlas or its app, please cite it as below."
+title: "Human Plasma Immune Atlas: an open, genetics-anchored causal map of the plasma immunome across the human disease phenome"
+abstract: >-
+  An interactive, fully public atlas linking 672 plasma immune proteins to 2,466
+  FinnGen R12 disease endpoints through 1.66 million cis-eQTL Mendelian
+  randomization tests, Bayesian colocalization, protein-level INTERVAL plasma
+  pQTL confirmation, independent non-FinnGen and UK Biobank replication, an
+  immune-cell/inflammation layer, and a novelty and therapeutic-direction
+  engine. Every figure is computed live from the underlying result tables and
+  is downloadable as CSV; the app requires no account or login.
+authors:
+  - family-names: Zhao
+    given-names: Jianli
+    email: jianlizhao@uab.edu
+version: 1.0.0
+date-released: 2026-08-13
+license: MIT
+repository-code: "https://github.com/jimmyuab/Human-Plasma-Immune-Atlas"
+url: "https://huggingface.co/spaces/jianlizhao/Human-Plasma-Immune-Atlas"
+keywords:
+  - plasma proteome
+  - immunome
+  - Mendelian randomization
+  - colocalization
+  - pQTL
+  - disease phenome
+  - drug target

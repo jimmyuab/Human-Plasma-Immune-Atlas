@@ -1,0 +1,105 @@
+{
+  "built": "2026-08-13 23:00",
+  "files": {
+    "mr_phenome_all.parquet": {
+      "rows": 1656872,
+      "MB": 52.83,
+      "note": "cis-eQTL MR, every gene x every FinnGen R12 endpoint"
+    },
+    "instruments.parquet": {
+      "rows": 672,
+      "MB": 0.02,
+      "note": "one cis-eQTL instrument per gene (eQTLGen)"
+    },
+    "endpoints.parquet": {
+      "rows": 2466,
+      "MB": 0.07,
+      "note": "FinnGen R12 endpoint dictionary"
+    },
+    "coloc_all.parquet": {
+      "rows": 900,
+      "MB": 0.05,
+      "note": "coloc.abf on every FDR-significant locus"
+    },
+    "coloc_phenome.parquet": {
+      "rows": 158,
+      "MB": 0.01,
+      "note": "coloc, 28-endpoint core panel"
+    },
+    "pqtl_mr.parquet": {
+      "rows": 247,
+      "MB": 0.03,
+      "note": "protein-level MR (INTERVAL plasma pQTL)"
+    },
+    "pqtl_coloc.parquet": {
+      "rows": 247,
+      "MB": 0.02,
+      "note": "protein-level coloc (INTERVAL)"
+    },
+    "replication.parquet": {
+      "rows": 28,
+      "MB": 0.01,
+      "note": "independent non-FinnGen GWAS replication"
+    },
+    "novelty_ranked.parquet": {
+      "rows": 176,
+      "MB": 0.02,
+      "note": "novelty-priority engine score"
+    },
+    "evidence_tiers.parquet": {
+      "rows": 32,
+      "MB": 0.02,
+      "note": "4-layer evidence tiering"
+    },
+    "uk_replication.parquet": {
+      "rows": 1505,
+      "MB": 0.08,
+      "note": "UK Biobank cross-population MR"
+    },
+    "cell_count_mr.parquet": {
+      "rows": 2652,
+      "MB": 0.16,
+      "note": "gene -> blood immune cell count MR"
+    },
+    "cell_crp_mr.parquet": {
+      "rows": 9969,
+      "MB": 0.57,
+      "note": "gene -> cell/CRP/cytokine trait MR"
+    },
+    "pleiotropy.parquet": {
+      "rows": 60,
+      "MB": 0.01,
+      "note": "cross-category pleiotropic genes"
+    },
+    "drug_direction.parquet": {
+      "rows": 25,
+      "MB": 0.01,
+      "note": "genetic direction vs approved-drug mechanism"
+    },
+    "class_enrichment.parquet": {
+      "rows": 6,
+      "MB": 0.01,
+      "note": "immune-class enrichment of causal targets"
+    },
+    "intelligence.parquet": {
+      "rows": 176,
+      "MB": 0.03,
+      "note": "disease-intelligence final table"
+    },
+    "t5_novelty.parquet": {
+      "rows": 40,
+      "MB": 0.01,
+      "note": "top novelty-priority targets"
+    },
+    "t4_druggable.parquet": {
+      "rows": 72,
+      "MB": 0.01,
+      "note": "druggable plasma immune proteins"
+    },
+    "t1_universe.parquet": {
+      "rows": 1007,
+      "MB": 0.05,
+      "note": "plasma immune protein universe (HPA/Olink)"
+    }
+  }
+}

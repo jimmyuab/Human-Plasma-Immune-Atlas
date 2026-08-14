@@ -1,0 +1,39 @@
+name: Sync to Hugging Face Space
+
+# Every push to main is mirrored to the Hugging Face Space, which then
+# rebuilds and restarts the app automatically.
+#
+# One-time setup:
+#   GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+#     name  : HF_TOKEN
+#     value : a Hugging Face token with WRITE role (https://huggingface.co/settings/tokens)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Pull LFS objects
+        run: git lfs pull
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "HF_TOKEN secret is not set — skipping."; exit 1
+          fi
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+          git push --force \
+            "https://jianlizhao:$HF_TOKEN@huggingface.co/spaces/jianlizhao/Human-Plasma-Immune-Atlas" \
+            main:main
