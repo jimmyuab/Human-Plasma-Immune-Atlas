@@ -20,6 +20,15 @@ import os
 import tempfile
 import functools
 
+# The free Hugging Face tier only offers ZeroGPU for Gradio Spaces, and its runtime
+# hooks itself in through this import — without it the Space serves fine but never
+# reports ready, so the page sits on "Starting" forever. The atlas is pure
+# pandas/matplotlib and never touches a GPU; this is only the readiness handshake.
+try:
+    import spaces  # noqa: F401
+except ImportError:
+    pass
+
 import numpy as np
 import pandas as pd
 import matplotlib
