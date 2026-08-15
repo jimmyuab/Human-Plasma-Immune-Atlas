@@ -1,5 +1,5 @@
 {
-  "built": "2026-08-13 23:00",
+  "built": "2026-08-14 20:30",
   "files": {
     "mr_phenome_all.parquet": {
       "rows": 1656872,
@@ -24,17 +24,17 @@
     "coloc_phenome.parquet": {
       "rows": 158,
       "MB": 0.01,
-      "note": "coloc, 28-endpoint core panel"
+      "note": "coloc, 28-endpoint benchmark panel"
     },
     "pqtl_mr.parquet": {
-      "rows": 247,
-      "MB": 0.03,
-      "note": "protein-level MR (INTERVAL plasma pQTL)"
+      "rows": 473,
+      "MB": 0.06,
+      "note": "protein-level MR (INTERVAL plasma pQTL), whole phenome"
     },
     "pqtl_coloc.parquet": {
-      "rows": 247,
-      "MB": 0.02,
-      "note": "protein-level coloc (INTERVAL)"
+      "rows": 595,
+      "MB": 0.04,
+      "note": "protein-level coloc (INTERVAL), whole phenome"
     },
     "replication.parquet": {
       "rows": 28,
@@ -42,9 +42,9 @@
       "note": "independent non-FinnGen GWAS replication"
     },
     "novelty_ranked.parquet": {
-      "rows": 176,
-      "MB": 0.02,
-      "note": "novelty-priority engine score"
+      "rows": 1016,
+      "MB": 0.09,
+      "note": "novelty-priority engine score, all causal pairs"
     },
     "evidence_tiers.parquet": {
       "rows": 32,
@@ -54,7 +54,12 @@
     "uk_replication.parquet": {
       "rows": 1505,
       "MB": 0.08,
-      "note": "UK Biobank cross-population MR"
+      "note": "UK Biobank cross-population MR scan"
+    },
+    "uk_twopop.parquet": {
+      "rows": 189,
+      "MB": 0.02,
+      "note": "two-population FinnGen->UK Biobank replication (UKB-only cohorts, exact-code + name-matched)"
     },
     "cell_count_mr.parquet": {
       "rows": 2652,
@@ -82,12 +87,12 @@
       "note": "immune-class enrichment of causal targets"
     },
     "intelligence.parquet": {
-      "rows": 176,
-      "MB": 0.03,
-      "note": "disease-intelligence final table"
+      "rows": 1016,
+      "MB": 0.06,
+      "note": "disease-intelligence final table, all causal pairs"
     },
     "t5_novelty.parquet": {
-      "rows": 40,
+      "rows": 100,
       "MB": 0.01,
       "note": "top novelty-priority targets"
     },

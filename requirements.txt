@@ -1,3 +1,5 @@
+# pinned to the README sdk_version so a local run matches the Space exactly
+gradio==5.49.1
 pandas>=2.0
 numpy>=1.26
 pyarrow>=14.0

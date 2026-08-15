@@ -62,6 +62,7 @@ PQ_MR = _load("pqtl_mr.parquet")
 PQ_CO = _load("pqtl_coloc.parquet")
 REPL = _load("replication.parquet")
 UKREP = _load("uk_replication.parquet")
+TWOPOP = _load("uk_twopop.parquet")
 CELL = _load("cell_crp_mr.parquet")
 CELLC = _load("cell_count_mr.parquet")
 NOVEL = _load("novelty_ranked.parquet")
@@ -198,19 +199,28 @@ def run_overview():
     summary = pd.DataFrame({
         "layer": ["1 cis-eQTL MR (eQTLGen -> FinnGen R12)", "2 Colocalisation (coloc.abf)",
                   "3 Plasma pQTL MR + coloc (INTERVAL)", "4 Independent replication",
-                  "5 Immune-cell / CRP layer", "6 Novelty engine"],
+                  "5 Two-population replication (Finland -> England)",
+                  "6 Immune-cell / CRP layer", "7 Novelty engine"],
         "content": [f"{n['genes']} immune genes x {n['endpoints']} disease endpoints = {n['tests']:,} tests",
                     f"{len(COLOC):,} significant loci fine-mapped",
-                    f"{len(PQ_MR):,} protein-level tests",
+                    f"{len(PQ_MR):,} protein-level tests across "
+                    f"{PQ_MR['disease'].nunique() if not PQ_MR.empty else 0} diseases",
                     f"{len(REPL)} non-FinnGen + {len(UKREP):,} UK Biobank cross-population tests",
+                    (f"{len(TWOPOP)} pairs, {TWOPOP['phenocode'].nunique()} diseases, "
+                     f"UK Biobank-only cohorts (no FinnGen overlap)" if not TWOPOP.empty else "not bundled"),
                     f"{len(CELL):,} gene x blood-trait tests",
                     f"{len(NOVEL):,} ranked candidate targets"],
         "result": [f"{n['sig']:,} pairs FDR<5% ({n['sig_genes']} genes, {n['sig_diseases']} diseases)",
                    f"{N_COLOC} loci with PP.H4 >= 0.8 (shared causal variant)",
-                   f"{int((PQ_MR['MR_p']<0.05).sum()) if not PQ_MR.empty else 0} nominally significant at protein level",
+                   f"{int((PQ_MR['FDR']<0.05).sum()) if not PQ_MR.empty else 0} significant at FDR<5% (protein level)",
                    f"{int(REPL['rep_sig'].sum()) if not REPL.empty else 0} replicated at P<0.05, all direction-concordant",
+                   (f"{int(TWOPOP['concordant'].astype(bool).sum())} same-direction "
+                    f"({100*TWOPOP['concordant'].astype(bool).mean():.0f}%), "
+                    f"{int(TWOPOP['two_population_validated'].astype(bool).sum())} validated at P<0.05"
+                    if not TWOPOP.empty else "-"),
                    f"{int((CELL['trait_FDR']<0.05).sum()) if not CELL.empty else 0} FDR<5% immune-cell links",
-                   f"{int((NOVEL['category_label'].astype(str).str.contains('NOVEL')).sum())} novel colocalised nominations"],
+                   f"{int((NOVEL['category_label'].astype(str).str.contains('NOVEL')).sum())} novel nominations, "
+                   f"{int((NOVEL['category_label'].astype(str)=='NOVEL protein-confirmed').sum())} protein-confirmed"],
     })
     return fig, summary, _csv(sig, "atlas_all_causal_pairs")
 
@@ -428,6 +438,10 @@ def run_card(gene, dis_label):
     pqc = PQ_CO[PQ_CO["gene"] == gene]
     rp = REPL[REPL["gene"] == gene]
     uk = UKREP[UKREP["gene_symbol"] == gene] if not UKREP.empty else pd.DataFrame()
+    # two-population arm: same gene AND same endpoint, so this is a like-for-like
+    # Finland-vs-England test rather than a match on gene alone
+    tp = (TWOPOP[(TWOPOP["gene_symbol"] == gene) & (TWOPOP["phenocode"] == code)]
+          if not TWOPOP.empty else pd.DataFrame())
     cl = CELL[(CELL["gene_symbol"] == gene) & (CELL["trait_FDR"] < 0.05)] if not CELL.empty else pd.DataFrame()
 
     fig = plt.figure(figsize=(13, 8.8))
@@ -484,6 +498,11 @@ def run_card(gene, dis_label):
         u = uk.nsmallest(1, "uk_p").iloc[0]
         bars.append(-np.log10(max(float(u["uk_p"]), 1e-300)))
         cols.append("#4f77aa"); labs.append("UK Biobank\n(cross-population)")
+    if not tp.empty:
+        t0 = tp.nsmallest(1, "uk_p").iloc[0]
+        bars.append(-np.log10(max(float(t0["uk_p"]), 1e-300)))
+        cols.append("#c0392b" if bool(t0["two_population_validated"]) else "#9ec5e8")
+        labs.append("UKB same endpoint\n(two-population)")
     ax.bar(range(len(bars)), bars, color=cols, edgecolor="black", linewidth=.5)
     ax.axhline(-np.log10(0.05), ls="--", color="k", lw=.8)
     ax.set_xticks(range(len(bars))); ax.set_xticklabels(labs, fontsize=7.5)
@@ -547,6 +566,7 @@ def run_card(gene, dis_label):
     card = pd.DataFrame({
         "layer": ["cis-eQTL MR (FinnGen R12)", "Colocalisation", "Plasma pQTL MR (INTERVAL)",
                   "Independent GWAS replication", "UK Biobank cross-population",
+                  "Two-population (Finland -> England, same endpoint)",
                   "Immune-cell / CRP layer", "Verdict"],
         "result": [
             f"OR {r.OR:.3f} ({r.OR_l95:.3f}-{r.OR_u95:.3f}), P={r.MR_p:.2e}, FDR={r.FDR:.2e}",
@@ -555,6 +575,10 @@ def run_card(gene, dis_label):
             (f"{rp.iloc[0]['rep_gwas']}: P={rp.iloc[0]['rep_p']:.2e}, "
              f"{'concordant' if rp.iloc[0].get('rep_concordant') else 'discordant'}" if not rp.empty else "no independent GWAS matched"),
             (f"best P={uk['uk_p'].min():.2e} across {len(uk)} UKB endpoints" if not uk.empty else "not tested"),
+            (f"{tp.iloc[0]['uk_trait']} ({tp.iloc[0]['match_method']}, {int(tp.iloc[0]['uk_ncase']):,} cases): "
+             f"UK OR {tp.iloc[0]['uk_OR']:.3f}, P={tp.iloc[0]['uk_p']:.2e}, "
+             f"{'VALIDATED — same direction' if bool(tp.iloc[0]['two_population_validated']) else ('same direction, not significant' if bool(tp.iloc[0]['concordant']) else 'opposite direction')}"
+             if not tp.empty else "no independent UK Biobank GWAS of this endpoint"),
             (f"{len(cl)} blood traits at FDR<5% (top: {cl.nsmallest(1,'trait_p').iloc[0]['trait_label']})" if not cl.empty else "none at FDR<5%"),
             f"Tier {tier}/5 — {verdict}; {act}"],
     })
@@ -606,8 +630,11 @@ Pick something on any tab and press **Run** — figures and a downloadable CSV a
 underlying result tables. Free and open: **no account, no login, no data upload.**
 """
 
-METHODS = """
+METHODS = f"""
 ## How the atlas is built
+
+Every layer below runs across the **whole FinnGen R12 phenome** — none is restricted to a curated
+disease list. The one exception is stated explicitly in Layer 5.
 
 **Layer 1 — cis-eQTL Mendelian randomisation.** One conditionally independent *cis*-eQTL per immune gene
 (eQTLGen, n ≈ 31,684) is used as the instrument. Effects are transported to disease using the Zhu/Wald ratio
@@ -621,23 +648,38 @@ PP.H4 ≥ 0.8 = shared causal variant; this separates real causal effects from L
 **Layer 3 — protein-level confirmation.** Plasma pQTL instruments from INTERVAL (Sun et al. 2018,
 fully public via the EBI GWAS Catalog) repeat the MR and colocalisation at the level of the circulating
 protein itself. Discordance between transcript and protein is reported, not hidden — it is informative
-(e.g. soluble decoy receptors act opposite to membrane signalling).
+(e.g. soluble decoy receptors act opposite to membrane signalling). This layer now spans
+{PQ_MR['disease'].nunique() if not PQ_MR.empty else 0} diseases
+({len(PQ_MR)} protein-level MR tests, {len(PQ_CO)} protein colocalisation loci).
 
 **Layer 4 — independent replication.** Every nomination is re-tested in non-FinnGen consortium GWAS
 (OpenGWAS) and in UK Biobank for cross-population support.
 
-**Layer 5 — immune-cell and inflammation layer.** The same instruments are tested against circulating
+**Layer 5 — two-population replication (Finland → England).** The same instrument and the same Wald
+ratio are applied to an independent UK Biobank GWAS of the *same* endpoint:
+{len(TWOPOP)} pairs over {TWOPOP['phenocode'].nunique() if not TWOPOP.empty else 0} diseases, of which
+{int(TWOPOP['concordant'].astype(bool).sum()) if not TWOPOP.empty else 0} agree in causal direction and
+{int(TWOPOP['two_population_validated'].astype(bool).sum()) if not TWOPOP.empty else 0} also reach
+P < 0.05. Only **single-cohort UK Biobank** datasets are eligible: several large public meta-analyses of
+these endpoints silently include FinnGen, so using them would mean replicating FinnGen in FinnGen. This
+layer cannot span the whole phenome, because it requires an independent UK GWAS of the same endpoint to
+exist; the matching route used for each pair is recorded in the downloadable table.
+
+**Layer 6 — immune-cell and inflammation layer.** The same instruments are tested against circulating
 blood-cell counts, CRP and cytokine traits, to show *how* the protein changes the immune system.
 
-**Layer 6 — novelty and therapeutic direction.** Targets are scored on causal strength, colocalisation,
-pleiotropy across disease chapters, druggability and cell source, with a penalty for already-approved
-drug axes and for the MHC region. Effect direction is translated into a therapeutic action:
+**Layer 7 — novelty and therapeutic direction.** Targets are scored on causal strength, colocalisation,
+pleiotropy across disease chapters, druggability, cell source, protein-level confirmation and
+two-population replication, with a penalty for already-approved drug axes and for the MHC region.
+Effect direction is translated into a therapeutic action:
 OR > 1 → block the protein; OR < 1 → agonise or replace it.
 
 ### Interpretation and limits
 * MR estimates are **lifelong genetically-proxied** effects, not the effect of a short drug course.
 * An HLA/MHC-region hit is held at *nomination* — long-range LD there defeats colocalisation.
 * eQTL instruments proxy transcript, not always circulating protein; Layer 3 is the arbiter.
+* About half of the causal proteins have no public SomaScan aptamer (largely intracellular or
+  MHC-region) and therefore cannot reach a protein-level tier from login-free data at all.
 * Nothing here is clinical advice or a validated diagnostic.
 
 ### Data sources
@@ -649,7 +691,8 @@ MSigDB C7/C8 immunologic signatures.
 > Zhao J. *Human Plasma Immune Atlas: an open, genetics-anchored causal map of the plasma immunome
 > across the human disease phenome.* Hugging Face Space, 2026.
 
-Code and data: see the GitHub repository linked in this Space. Released under Apache-2.0.
+Code and data: https://github.com/jimmyuab/Human-Plasma-Immune-Atlas — released under the MIT licence.
+The underlying GWAS/eQTL datasets remain under their own licences and conditions of use.
 """
 
 with gr.Blocks(title="Human Plasma Immune Atlas", theme=gr.themes.Soft(), css=CSS) as demo:

@@ -75,13 +75,15 @@ if os.path.exists(src):
 # ------------------------------------------------------------------ 2. colocalization
 for fn, out, note in [
     ("coloc_ALL_finngen_results.tsv", "coloc_all.parquet", "coloc.abf on every FDR-significant locus"),
-    ("coloc_phenome_results.tsv",     "coloc_phenome.parquet", "coloc, 28-endpoint core panel"),
-    ("pqtl_MR_results.tsv",           "pqtl_mr.parquet", "protein-level MR (INTERVAL plasma pQTL)"),
-    ("pqtl_coloc_results.tsv",        "pqtl_coloc.parquet", "protein-level coloc (INTERVAL)"),
+    ("coloc_phenome_results.tsv",     "coloc_phenome.parquet", "coloc, 28-endpoint benchmark panel"),
+    ("pqtl_MR_ALL_finngen_results.tsv",    "pqtl_mr.parquet", "protein-level MR (INTERVAL plasma pQTL), whole phenome"),
+    ("pqtl_coloc_ALL_finngen_results.tsv", "pqtl_coloc.parquet", "protein-level coloc (INTERVAL), whole phenome"),
     ("opengwas_replication.tsv",      "replication.parquet", "independent non-FinnGen GWAS replication"),
-    ("novelty_engine_ranked.tsv",     "novelty_ranked.parquet", "novelty-priority engine score"),
+    ("novelty_engine_ranked_ALL.tsv", "novelty_ranked.parquet", "novelty-priority engine score, all causal pairs"),
     ("FINAL_evidence_tiers_repl.tsv", "evidence_tiers.parquet", "4-layer evidence tiering"),
-    ("uk_cis_MR_results.tsv",         "uk_replication.parquet", "UK Biobank cross-population MR"),
+    ("uk_cis_MR_results.tsv",         "uk_replication.parquet", "UK Biobank cross-population MR scan"),
+    ("uk_panphenome_concordance_ALL.tsv", "uk_twopop.parquet",
+     "two-population FinnGen->UK Biobank replication (UKB-only cohorts, exact-code + name-matched)"),
     ("immune_cell_count_MR_results.tsv", "cell_count_mr.parquet", "gene -> blood immune cell count MR"),
     ("extended_cell_crp_MR_results.tsv", "cell_crp_mr.parquet", "gene -> cell/CRP/cytokine trait MR"),
     ("phenome_pleiotropy_axes.tsv",   "pleiotropy.parquet", "cross-category pleiotropic genes"),
@@ -90,12 +92,16 @@ for fn, out, note in [
 ]:
     df = read_tsv(os.path.join(GC, fn))
     if df is not None:
+        # the whole-phenome novelty table calls the organ-system column
+        # disease_system; the app expects disease_category
+        if out == "novelty_ranked.parquet" and "disease_system" in df.columns:
+            df = df.rename(columns={"disease_system": "disease_category"})
         save(df, out, note)
 
 # ------------------------------------------------------------------ 3. curated tables
 for fn, out, note in [
-    ("T6_disease_intelligence_final_table.tsv", "intelligence.parquet", "disease-intelligence final table"),
-    ("T5_novelty_priority_targets.tsv", "t5_novelty.parquet", "top novelty-priority targets"),
+    ("T6_disease_intelligence_final_table_ALL.tsv", "intelligence.parquet", "disease-intelligence final table, all causal pairs"),
+    ("T7_novelty_priority_targets_ALL.tsv", "t5_novelty.parquet", "top novelty-priority targets"),
     ("T4_druggable_immune_targets.tsv", "t4_druggable.parquet", "druggable plasma immune proteins"),
     ("T1_plasma_immune_universe.tsv",   "t1_universe.parquet", "plasma immune protein universe (HPA/Olink)"),
 ]:
