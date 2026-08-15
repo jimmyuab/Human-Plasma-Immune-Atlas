@@ -17,6 +17,7 @@ Layers
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 import functools
 
@@ -138,6 +139,38 @@ def _empty_fig(msg: str):
     return fig
 
 
+# FinnGen chapter names run to 109 characters ("III Diseases of the blood and
+# blood-forming organs and certain disorders involving the immune mechanism (D3_)"),
+# and there are 42 of them — unusable as axis labels. Key off the chapter code, which
+# is stable, and fall back to tidying the free-text category names.
+_CHAPTER = {
+    "AB1_": "Infectious & parasitic", "CD2_": "Neoplasms (hospital)",
+    "ICD-O-3": "Neoplasms (cancer reg.)", "D3_": "Blood & immune mechanism",
+    "E4_": "Endocrine & metabolic", "F5_": "Mental & behavioural",
+    "G6_": "Nervous system", "H7_": "Eye & adnexa", "H8_": "Ear & mastoid",
+    "I9_": "Circulatory", "J10_": "Respiratory", "K11_": "Digestive",
+    "L12_": "Skin & subcutaneous", "M13_": "Musculoskeletal",
+    "N14_": "Genitourinary", "O15_": "Pregnancy & childbirth",
+    "P16_": "Perinatal", "Q17": "Congenital", "R18_": "Symptoms & signs",
+    "ST19_": "Injury & poisoning", "Z21_": "Health-service contact",
+    "U22_": "Special-purpose codes",
+}
+
+
+def _short_cat(name: str) -> str:
+    s = str(name).strip()
+    for code, short in _CHAPTER.items():
+        if f"({code})" in s or s.endswith(code):
+            return short
+    s = re.sub(r"\s*\([^)]*\)\s*$", "", s)              # drop a trailing code
+    s = re.sub(r"^(?:[IVXL]+)\s+", "", s)               # drop the roman numeral
+    s = re.sub(r"\s+endpoints?$", "", s, flags=re.I)
+    s = re.sub(r"^Comorbidities of\s+", "Comorbid: ", s, flags=re.I)
+    s = re.sub(r"\s+from .*$", "", s)                   # "... from Katri Räikkönen"
+    # no truncation: the labels are printed vertically, so full names always fit
+    return s or "Unclassified"
+
+
 # =========================================================== TAB 1 — atlas overview
 @functools.lru_cache(maxsize=1)
 def _overview_numbers():
@@ -249,33 +282,68 @@ def run_gene(gene, fdr_only, top_n):
         return _empty_fig(f"{gene}: no results"), _empty_fig(""), pd.DataFrame(), None
     d["category"] = d["category"].fillna("Unclassified")
     d = d.sort_values(["category", "phenotype"]).reset_index(drop=True)
-    d["x"] = np.arange(len(d))
     inst = INST[INST["gene_symbol"] == gene].iloc[0]
 
     # --- phenome-wide plot
-    fig1, ax = plt.subplots(figsize=(13, 4.8))
+    # FinnGen's 42 disease chapters differ ~100-fold in endpoint count, so laying the
+    # x-axis out by raw endpoint index crushes the small chapters into a few pixels and
+    # their names collide into an unreadable smear. Instead give every chapter an equal
+    # one-unit slot (points spread inside it), split the scan across two stacked rows,
+    # and print the chapter names vertically so each one is fully legible and can never
+    # overlap its neighbour.
     cats = d["category"].unique().tolist()
+    slot = {c: j for j, c in enumerate(cats)}
+    d["x"] = (d.groupby("category").cumcount() + .5) / d["category"].map(
+        d["category"].value_counts()) + d["category"].map(slot)
+
     colours = plt.cm.tab20(np.linspace(0, 1, max(len(cats), 2)))
-    ticks, labels = [], []
-    for i, c in enumerate(cats):
-        sub = d[d["category"] == c]
-        ax.scatter(sub["x"], sub["nlp"], s=11, color=colours[i % len(colours)], alpha=.8, edgecolors="none")
-        ticks.append(sub["x"].mean())
-        labels.append(c.split("(")[0].strip()[:22])
+    half = int(np.ceil(len(cats) / 2))
+    rows = [cats[:half], cats[half:]] if len(cats) > 8 else [cats]
+
     thr = -np.log10(0.05 / len(d))
-    ax.axhline(thr, color="k", ls="--", lw=.8)
-    ax.text(len(d) * .995, thr, "  phenome-wide", va="bottom", ha="right", fontsize=7)
-    sig = d[d["FDR"] < 0.05].nlargest(min(int(top_n), 12), "nlp")
-    for r in sig.itertuples():
-        ax.annotate(str(r.phenotype)[:40], (r.x, r.nlp), fontsize=7, fontweight="bold",
-                    xytext=(0, 5), textcoords="offset points", ha="center",
-                    color=RISK if r.OR > 1 else PROT)
-    ax.set_xticks(ticks); ax.set_xticklabels(labels, rotation=55, ha="right", fontsize=6.5)
-    ax.set_ylabel("-log10 P (cis-eQTL MR)")
-    ax.set_xlim(-8, len(d) + 8)
-    ax.set_title(f"{gene} — phenome-wide causal scan across {len(d):,} FinnGen R12 endpoints\n"
-                 f"instrument {inst.SNP} (chr{inst.chr}, EAF {inst.eaf:.2f}) · class: {inst.immune_class}",
-                 fontsize=11)
+    # the top hits are named vertically above their point, so leave the upper part of
+    # the axis free for that text instead of letting the names pile on top of each other
+    ymax = max(float(d["nlp"].max()), thr) * 1.85
+    sig = (d[d["FDR"] < 0.05].sort_values("nlp", ascending=False)
+           .drop_duplicates("category")            # one name per chapter -> never collide
+           .nlargest(min(int(top_n), 14), "nlp"))
+
+    width = max(11.0, 0.62 * max(len(r) for r in rows))
+    fig1, axes = plt.subplots(len(rows), 1, figsize=(width, 3.6 * len(rows) + 1.6))
+    axes = np.atleast_1d(axes)
+    for ax, row in zip(axes, rows):
+        if not row:
+            ax.axis("off"); continue
+        x0, x1 = slot[row[0]], slot[row[-1]] + 1
+        ticks, labels = [], []
+        for j, c in enumerate(row):
+            i = slot[c]
+            sub = d[d["category"] == c]
+            if j % 2:                      # alternate shading = visible chapter blocks
+                ax.axvspan(i, i + 1, color="#f2f2f5", zorder=0, lw=0)
+            ax.scatter(sub["x"], sub["nlp"], s=11, color=colours[i % len(colours)],
+                       alpha=.85, edgecolors="none", zorder=2)
+            ticks.append(i + .5)
+            labels.append(f"{_short_cat(c)}  ({len(sub)})")
+        ax.axhline(thr, color="k", ls="--", lw=.8, zorder=1)
+        ax.text(x1, thr, "phenome-wide  ", va="bottom", ha="right", fontsize=7)
+        for r in sig.itertuples():
+            if x0 <= r.x <= x1:
+                ax.annotate(str(r.phenotype)[:34], (r.x, r.nlp), fontsize=7, fontweight="bold",
+                            xytext=(0, 5), textcoords="offset points", ha="center",
+                            va="bottom", rotation=90,
+                            color=RISK if r.OR > 1 else PROT, zorder=4)
+        ax.set_xticks(ticks)
+        ax.set_xticklabels(labels, rotation=90, ha="center", va="top", fontsize=7.5)
+        ax.tick_params(axis="x", length=2, pad=2)
+        ax.set_ylabel("-log10 P (cis-eQTL MR)", fontsize=8.5)
+        ax.set_xlim(x0, x1)
+        ax.set_ylim(0, ymax)
+    axes[0].set_title(f"{gene} — phenome-wide causal scan across {len(d):,} FinnGen R12 endpoints\n"
+                      f"instrument {inst.SNP} (chr{inst.chr}, EAF {inst.eaf:.2f}) · class: {inst.immune_class}\n"
+                      f"each disease chapter gets an equal slot; (n) = endpoints tested in it",
+                      fontsize=10.5)
+    fig1.tight_layout(h_pad=2.0)
 
     # --- forest of top hits
     tab = d[d["FDR"] < 0.05] if fdr_only else d
