@@ -8,7 +8,7 @@ sdk_version: 5.49.1
 app_file: app.py
 pinned: true
 license: mit
-short_description: Open causal map from the plasma immunome to the human disease phenome
+short_description: Causal map from the plasma immunome to the disease phenome
 tags:
   - biology
   - genomics
