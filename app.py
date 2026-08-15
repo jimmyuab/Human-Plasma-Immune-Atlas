@@ -799,4 +799,8 @@ with gr.Blocks(title="Human Plasma Immune Atlas", theme=gr.themes.Soft(), css=CS
         gr.Markdown(METHODS)
 
 if __name__ == "__main__":
-    demo.queue(max_size=32).launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)))
+    # ssr_mode=False: Gradio 5's experimental server-side rendering answers the
+    # Space's readiness probe with 405s, so the Space never leaves APP_STARTING.
+    demo.queue(max_size=32).launch(server_name="0.0.0.0",
+                                   server_port=int(os.environ.get("PORT", 7860)),
+                                   ssr_mode=False)
